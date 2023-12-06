@@ -36,99 +36,33 @@ namespace ByteBank.View
         {
             var contas = r_Repositorio.GetContaClientes();
 
-            var contasQuantidadePorThread = contas.Count() / 4;
-
-            //pega os primeiros elementos
-            //var contas_parte1 = contas.Take(contas.Count() / 2);
-            var contas_parte1 = contas.Take(contasQuantidadePorThread);
-
-
-            //pula uma parte dos elementos
-            //var contas_parte2 = contas.Skip(contas.Count() / 2);
-
-            var contas_parte2 = contas.Skip(contasQuantidadePorThread).Take(contasQuantidadePorThread);
-            var contas_parte3 = contas.Skip(contasQuantidadePorThread * 2).Take(contasQuantidadePorThread);
-            var contas_parte4 = contas.Skip(contasQuantidadePorThread * 3);
-
-
             var resultado = new List<string>();
 
             AtualizarView(new List<string>(), TimeSpan.Zero);
 
             var inicio = DateTime.Now;
 
-            //delegate é pode ser representado por uma função lambda, somente isso não é suficiente para iniciar a thread, precisa do método Start()
-            Thread thread_parte_1 = new Thread(() =>
+
+            //O linq é preguiçoso (Select),precis usar a variável contasTarefas para que o linq execute a query, com isso precisa
+            //adicionar um ToArray() no final
+
+            var contasTarefas = contas.Select(conta =>
             {
-                foreach (var conta in contas_parte1)
+
+                //vai definir quando a tarefa deve ser executada, qual o melhor momento e local
+                //TaskScheduler -> task.factory
+                //controi tarefas
+
+                return Task.Factory.StartNew(() =>
                 {
-                    var resultadoProcessamento = r_Servico.ConsolidarMovimentacao(conta);
+                    var resultadoConta = r_Servico.ConsolidarMovimentacao(conta);
 
-                    resultado.Add(resultadoProcessamento);
-                }
-            });
+                    resultado.Add(resultadoConta);
+                });
+            }).ToArray();
 
-
-            Thread thread_parte_2 = new Thread(() =>
-            {
-                foreach (var conta in contas_parte2)
-                {
-                    var resultadoProcessamento = r_Servico.ConsolidarMovimentacao(conta);
-
-                    resultado.Add(resultadoProcessamento);
-                }
-            });
-
-            Thread thread_parte_3 = new Thread(() =>
-            {
-                foreach (var conta in contas_parte3)
-                {
-                    var resultadoProcessamento = r_Servico.ConsolidarMovimentacao(conta);
-
-                    resultado.Add(resultadoProcessamento);
-                }
-            });
-
-            Thread thread_parte_4 = new Thread(() =>
-            {
-                foreach (var conta in contas_parte4)
-                {
-                    var resultadoProcessamento = r_Servico.ConsolidarMovimentacao(conta);
-
-                    resultado.Add(resultadoProcessamento);
-                }
-            });
-
-            Console.WriteLine($"Thread parte 1, {thread_parte_1.ManagedThreadId} {thread_parte_1.ThreadState} {thread_parte_1.IsAlive}");
-            Console.WriteLine($"Thread parte 2, {thread_parte_2.ManagedThreadId} {thread_parte_2.ThreadState} {thread_parte_2.IsAlive}");
-            Console.WriteLine($"Thread parte 3, {thread_parte_3.ManagedThreadId} {thread_parte_3.ThreadState} {thread_parte_3.IsAlive}");
-            Console.WriteLine($"Thread parte 4, {thread_parte_4.ManagedThreadId} {thread_parte_4.ThreadState} {thread_parte_4.IsAlive}");
-
-
-            thread_parte_1.Start();
-            thread_parte_2.Start();
-            thread_parte_3.Start();
-            thread_parte_4.Start();
-
-            Console.WriteLine($"Thread parte 1, {thread_parte_1.ManagedThreadId} {thread_parte_1.IsAlive}");
-            Console.WriteLine($"Thread parte 2, {thread_parte_2.ManagedThreadId} {thread_parte_2.IsAlive}");
-            Console.WriteLine($"Thread parte 3, {thread_parte_3.ManagedThreadId} {thread_parte_3.IsAlive}");
-            Console.WriteLine($"Thread parte 4, {thread_parte_4.ManagedThreadId} {thread_parte_4.IsAlive}");
-
-            //verifica se a thread terminou ou está em execução
-            while (thread_parte_1.IsAlive || thread_parte_2.IsAlive || thread_parte_3.IsAlive || thread_parte_4.IsAlive)
-            {
-                //Sem o Sleep continua gastando memória, como sleep coloca pra aguardar
-                Thread.Sleep(250);
-                //Não vai fazer nada... vai ficar esperando até as Threads terminarem
-            }
-
-            //código linha a linha
-            //foreach (var conta in contas)
-            //{
-            //    var resultadoConta = r_Servico.ConsolidarMovimentacao(conta);
-            //    resultado.Add(resultadoConta);
-            //}
+            //trava execução do método até que tudo termine
+            Task.WaitAll(contasTarefas);
 
             var fim = DateTime.Now;
 
