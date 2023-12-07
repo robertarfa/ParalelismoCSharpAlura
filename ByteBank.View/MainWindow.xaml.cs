@@ -32,69 +32,41 @@ namespace ByteBank.View
             r_Servico = new ContaClienteService();
         }
 
-        private void BtnProcessar_Click(object sender, RoutedEventArgs e)
+        private async void BtnProcessar_Click(object sender, RoutedEventArgs e)
         {
-
-            var taskSchedulerUI = TaskScheduler.FromCurrentSynchronizationContext();
 
             BtnProcessar.IsEnabled = false;
 
             var contas = r_Repositorio.GetContaClientes();
 
-            var resultado = new List<string>();
-
             AtualizarView(new List<string>(), TimeSpan.Zero);
 
             var inicio = DateTime.Now;
 
+            var resultado = await ConsolidaContas(contas);
 
-            //O linq é preguiçoso (Select),precis usar a variável contasTarefas para que o linq execute a query, com isso precisa
-            //adicionar um ToArray() no final
+            var fim = DateTime.Now;
 
-            var contasTarefas = contas.Select(conta =>
-            {
+            AtualizarView(resultado, fim - inicio);
 
-                //vai definir quando a tarefa deve ser executada, qual o melhor momento e local
-                //TaskScheduler -> task.factory
-                //controi tarefas
+            BtnProcessar.IsEnabled = true;
+        }
 
-                return Task.Factory.StartNew(() =>
-                {
-                    var resultadoConta = r_Servico.ConsolidarMovimentacao(conta);
+        private async Task<string[]> ConsolidaContas(IEnumerable<ContaCliente> contas)
+        {
 
-                    resultado.Add(resultadoConta);
-                });
-            }).ToArray();
+            var tasks = contas.Select(conta =>
+                Task.Factory.StartNew(() => r_Servico.ConsolidarMovimentacao(conta))
+              );
 
-            //trava execução do método até que tudo termine
-            //Task.WaitAll(contasTarefas);
-
-            //Vai retornar o taskScheduler que está atuando no momento, vai ser executado pela thread principal, se colocar dentro da task
-            //o retorno vai ser diferente
-            //TaskScheduler.FromCurrentSynchronizationContext();
-
-            //Ao invés de travar e esperar as tarefas, vai ter uma tarefa que irá esperar outras tarefas
-            Task.WhenAll(contasTarefas)
-                .ContinueWith(task =>
-                {
-                    Console.WriteLine(task);
-
-                    var fim = DateTime.Now;
-
-                    AtualizarView(resultado, fim - inicio);
-                }, taskSchedulerUI)
-                .ContinueWith(task =>
-                {
-                    BtnProcessar.IsEnabled = true;
-                }, taskSchedulerUI);
-
+            return await Task.WhenAll(tasks);
 
         }
 
-        private void AtualizarView(List<String> result, TimeSpan elapsedTime)
+        private void AtualizarView(IEnumerable<String> result, TimeSpan elapsedTime)
         {
             var tempoDecorrido = $"{elapsedTime.Seconds}.{elapsedTime.Milliseconds} segundos!";
-            var mensagem = $"Processamento de {result.Count} clientes em {tempoDecorrido}";
+            var mensagem = $"Processamento de {result.Count()} clientes em {tempoDecorrido}";
 
             LstResultados.ItemsSource = result;
             TxtTempo.Text = mensagem;

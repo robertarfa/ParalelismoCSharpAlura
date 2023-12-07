@@ -1,0 +1,52 @@
+ var taskSchedulerUI = TaskScheduler.FromCurrentSynchronizationContext();
+
+ BtnProcessar.IsEnabled = false;
+
+ var contas = r_Repositorio.GetContaClientes();
+
+ var resultado = new List<string>();
+
+ AtualizarView(new List<string>(), TimeSpan.Zero);
+
+ var inicio = DateTime.Now;
+
+
+ //O linq é preguiçoso (Select),precis usar a variável contasTarefas para que o linq execute a query, com isso precisa
+ //adicionar um ToArray() no final
+
+ var contasTarefas = contas.Select(conta =>
+ {
+
+     //vai definir quando a tarefa deve ser executada, qual o melhor momento e local
+     //TaskScheduler -> task.factory
+     //controi tarefas
+
+     return Task.Factory.StartNew(() =>
+     {
+         var resultadoConta = r_Servico.ConsolidarMovimentacao(conta);
+
+         resultado.Add(resultadoConta);
+     });
+ }).ToArray();
+
+ //trava execução do método até que tudo termine
+ //Task.WaitAll(contasTarefas);
+
+ //Vai retornar o taskScheduler que está atuando no momento, vai ser executado pela thread principal, se colocar dentro da task
+ //o retorno vai ser diferente
+ //TaskScheduler.FromCurrentSynchronizationContext();
+
+ //Ao invés de travar e esperar as tarefas, vai ter uma tarefa que irá esperar outras tarefas
+ Task.WhenAll(contasTarefas)
+     .ContinueWith(task =>
+     {
+         Console.WriteLine(task);
+
+         var fim = DateTime.Now;
+
+         AtualizarView(resultado, fim - inicio);
+     }, taskSchedulerUI)
+     .ContinueWith(task =>
+     {
+         BtnProcessar.IsEnabled = true;
+     }, taskSchedulerUI);
