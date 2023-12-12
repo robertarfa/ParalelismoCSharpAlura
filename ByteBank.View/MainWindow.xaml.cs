@@ -1,6 +1,7 @@
 ﻿using ByteBank.Core.Model;
 using ByteBank.Core.Repository;
 using ByteBank.Core.Service;
+using ByteBank.View.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -39,11 +40,15 @@ namespace ByteBank.View
 
             var contas = r_Repositorio.GetContaClientes();
 
-            AtualizarView(new List<string>(), TimeSpan.Zero);
+            PgsProgresso.Maximum = contas.Count();
+
+            LimparView();
 
             var inicio = DateTime.Now;
 
-            var resultado = await ConsolidaContas(contas);
+            var byteBankProgress = new ByteBankProgress<string>(str => PgsProgresso.Value++);
+
+            var resultado = await ConsolidaContas(contas, byteBankProgress);
 
             var fim = DateTime.Now;
 
@@ -52,11 +57,30 @@ namespace ByteBank.View
             BtnProcessar.IsEnabled = true;
         }
 
-        private async Task<string[]> ConsolidaContas(IEnumerable<ContaCliente> contas)
+        private void LimparView()
         {
+            LstResultados.ItemsSource = null;
+            TxtTempo.Text = string.Empty;
+            PgsProgresso.Value = 0;
+        }
+        private async Task<string[]> ConsolidaContas(IEnumerable<ContaCliente> contas, IProgress<string> reportadorDeProgresso)
+        {
+            //Vai ser substituido pelo IProgress
+            //var taskSchedulerGui = TaskScheduler.FromCurrentSynchronizationContext();
 
             var tasks = contas.Select(conta =>
-                Task.Factory.StartNew(() => r_Servico.ConsolidarMovimentacao(conta))
+                Task.Factory.StartNew(() =>
+                {
+                    var resultado = r_Servico.ConsolidarMovimentacao(conta);
+
+                    reportadorDeProgresso.Report(resultado);
+                    //O código acima irá substituir o código abaixo.
+
+                    //Action action, CancellationToken cancellationToken, TaskCreationOptions creationOptions, InternalTaskOptions internalOptions, TaskScheduler scheduler
+                    //Task.Factory.StartNew(() => PgsProgresso.Value++, CancellationToken.None, TaskCreationOptions.None, taskSchedulerGui);
+
+                    return resultado;
+                })
               );
 
             return await Task.WhenAll(tasks);
