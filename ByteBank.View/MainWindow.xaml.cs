@@ -24,6 +24,7 @@ namespace ByteBank.View
     {
         private readonly ContaClienteRepository r_Repositorio;
         private readonly ContaClienteService r_Servico;
+        private CancellationTokenSource _cts;
 
         public MainWindow()
         {
@@ -38,6 +39,8 @@ namespace ByteBank.View
 
             BtnProcessar.IsEnabled = false;
 
+            _cts = new CancellationTokenSource();
+
             var contas = r_Repositorio.GetContaClientes();
 
             PgsProgresso.Maximum = contas.Count();
@@ -46,28 +49,50 @@ namespace ByteBank.View
 
             var inicio = DateTime.Now;
 
+            BtnCancelar.IsEnabled = true;
 
             // Nós criamos o ByteBankProgress mas já existe uma função nativa que faz a mesma coisa,
             //no caso o Progress
             //var byteBankProgress = new ByteBankProgress<string>(str => PgsProgresso.Value++);
             var progress = new Progress<string>(str => PgsProgresso.Value++);
 
-            var resultado = await ConsolidaContas(contas, progress);
+            try
+            {
+                var resultado = await ConsolidaContas(contas, progress, _cts.Token);
 
-            var fim = DateTime.Now;
+                var fim = DateTime.Now;
 
-            AtualizarView(resultado, fim - inicio);
+                AtualizarView(resultado, fim - inicio);
+            }
+            catch (OperationCanceledException)
+            {
+                TxtTempo.Text = "Operação Cancelada pelo usuário!";
+            }
 
-            BtnProcessar.IsEnabled = true;
+            finally
+            {
+                BtnProcessar.IsEnabled = true;
+                BtnCancelar.IsEnabled = false;
+            }
+
+
+
+
         }
 
+        private void BtnCancelar_Click(object sender, RoutedEventArgs e)
+        {
+            BtnCancelar.IsEnabled = false;
+
+            _cts.Cancel();
+        }
         private void LimparView()
         {
             LstResultados.ItemsSource = null;
             TxtTempo.Text = string.Empty;
             PgsProgresso.Value = 0;
         }
-        private async Task<string[]> ConsolidaContas(IEnumerable<ContaCliente> contas, IProgress<string> reportadorDeProgresso)
+        private async Task<string[]> ConsolidaContas(IEnumerable<ContaCliente> contas, IProgress<string> reportadorDeProgresso, CancellationToken ct)
         {
             //Vai ser substituido pelo IProgress
             //var taskSchedulerGui = TaskScheduler.FromCurrentSynchronizationContext();
@@ -75,7 +100,15 @@ namespace ByteBank.View
             var tasks = contas.Select(conta =>
                 Task.Factory.StartNew(() =>
                 {
-                    var resultado = r_Servico.ConsolidarMovimentacao(conta);
+
+                    //É uma boa prática cancelar no início, para voltar o que foi processado
+                    //if (ct.IsCancellationRequested)
+                    //    throw new OperationCanceledException(ct);
+
+                    //substitui o código acima
+                    ct.ThrowIfCancellationRequested();
+
+                    var resultado = r_Servico.ConsolidarMovimentacao(conta, ct);
 
                     reportadorDeProgresso.Report(resultado);
                     //O código acima irá substituir o código abaixo.
@@ -83,8 +116,11 @@ namespace ByteBank.View
                     //Action action, CancellationToken cancellationToken, TaskCreationOptions creationOptions, InternalTaskOptions internalOptions, TaskScheduler scheduler
                     //Task.Factory.StartNew(() => PgsProgresso.Value++, CancellationToken.None, TaskCreationOptions.None, taskSchedulerGui);
 
+                    ct.ThrowIfCancellationRequested();
+
                     return resultado;
-                })
+                }, ct) //Passando esse parâmetro, o taskScheduler sabe que nem
+                       //deve iniciar uma tarefa que já foi cancelada
               );
 
             return await Task.WhenAll(tasks);
@@ -101,9 +137,6 @@ namespace ByteBank.View
         }
 
 
-        private void BtnCancelar_Click(object sender, RoutedEventArgs e)
-        {
-            BtnCancelar.IsEnabled = false;
-        }
+
     }
 }

@@ -39,9 +39,9 @@
             </Button>
 
         </Grid>
-        
-        
-        
+
+
+
         <!-- Resultado -->
         <TextBlock DockPanel.Dock="Top">Resultado:</TextBlock>
         <TextBlock DockPanel.Dock="Top"

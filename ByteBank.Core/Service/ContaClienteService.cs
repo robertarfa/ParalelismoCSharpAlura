@@ -10,11 +10,13 @@ namespace ByteBank.Core.Service
 {
     public class ContaClienteService
     {
+        //mantém a sobrecarga para chamadas antigas
         public string ConsolidarMovimentacao(ContaCliente conta)
         {
             return ConsolidarMovimentacao(conta, CancellationToken.None);
         }
 
+        //faz a nova sobrecarga, com o novo parâmetro
         public string ConsolidarMovimentacao(ContaCliente conta, CancellationToken ct)
         {
             var soma = 0m;
@@ -36,15 +38,15 @@ namespace ByteBank.Core.Service
 
             var diasCorridosDesdeDataMovimento = (dataMovimento - new DateTime(1900, 1, 1)).Days;
             var resultado = 1m;
-            
-            for (int i = 0; i < diasCorridosDesdeDataMovimento*2; i++)
+
+            for (int i = 0; i < diasCorridosDesdeDataMovimento * 2; i++)
                 resultado = resultado * CTE_FATOR;
 
             return resultado;
         }
         private static void AtualizarInvestimentos(ContaCliente cliente)
         {
-            const decimal CTE_BONIFICACAO_MOV = 1m/(10m*5m);
+            const decimal CTE_BONIFICACAO_MOV = 1m / (10m * 5m);
             cliente.Investimento *= CTE_BONIFICACAO_MOV;
         }
     }
