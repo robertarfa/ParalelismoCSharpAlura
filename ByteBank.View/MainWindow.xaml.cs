@@ -46,9 +46,13 @@ namespace ByteBank.View
 
             var inicio = DateTime.Now;
 
-            var byteBankProgress = new ByteBankProgress<string>(str => PgsProgresso.Value++);
 
-            var resultado = await ConsolidaContas(contas, byteBankProgress);
+            // Nós criamos o ByteBankProgress mas já existe uma função nativa que faz a mesma coisa,
+            //no caso o Progress
+            //var byteBankProgress = new ByteBankProgress<string>(str => PgsProgresso.Value++);
+            var progress = new Progress<string>(str => PgsProgresso.Value++);
+
+            var resultado = await ConsolidaContas(contas, progress);
 
             var fim = DateTime.Now;
 
